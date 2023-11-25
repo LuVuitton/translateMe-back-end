@@ -274,6 +274,9 @@ export class AssignmentService {
         .where('a.customer_id = :authUserID', { authUserID })
         .getMany();
 
+        console.log("allllll:", allMyAssignment);
+        
+
         const requiredLangData = {};
         const customerLangData = {};
         for (const e of allMyAssignment) {

@@ -22,19 +22,22 @@ export class CandidatesService {
 
   async getCandidatesByAssignmentID(assignmentID: number) {
     let arrayCandidates: any[];
+    let candidates: any[];
     try {
-      const candidates = await this.candidateRepository
+      candidates = await this.candidateRepository
         .createQueryBuilder('c')
         .where('c.assignment_id = :id', {
           id: assignmentID,
         })
         .leftJoinAndSelect('c.user_id', 'user')
+        .leftJoinAndSelect('c.assignment_id', 'assignment')
         .select([
           'c.candidate_creation_date',
           'c.assignment_id',
           'user.user_id',
           'user.full_name',
           'user.user_photo',
+          'assignment.executor_id',
         ])
         .getRawMany();
 
@@ -45,6 +48,7 @@ export class CandidatesService {
           candidate_id: e.user_user_id,
           candidate_full_name: e.user_full_name,
           candidate_photo: e.user_user_photo,
+          isExecutor: e.user_user_id === e.executor_id,
         };
       });
     } catch (error) {
@@ -61,27 +65,6 @@ export class CandidatesService {
   async getAssignmentsByCandidateID(candidateID: number) {
     let arrayAssignments: any[];
     try {
-      // const assignments = await this.candidateRepository
-      //   .createQueryBuilder('c')
-      //   .where('c.user_id = :id', {
-      //     id: candidateID,
-      //   })
-      //   .leftJoinAndSelect('c.assignment_id', 'assignment')
-      //   .select([
-      //     'c.assignment_id',
-      //     'c.candidate_creation_date',
-      //     'assignment_worth',
-      //     'assignment_assignment_status',
-      //     'assignment_address',
-      //     'assignment_assignment_date',
-      //     'assignment_country_id',
-      //     'assignment_city_id',
-      //     'assignment_assignment_title',
-      //     'assignment_assignment_description',
-      //     'assignment_executor_id',
-      //     'assignment_execution_time_minutes',
-      //   ])
-      //   .getRawMany();
       const assignments = await this.candidateRepository
         .createQueryBuilder('c')
         .where('c.user_id = :id', {
@@ -91,7 +74,7 @@ export class CandidatesService {
         .select([
           'c.assignment_id',
           'c.candidate_creation_date',
-          'assignment.worth', 
+          'assignment.worth',
           'assignment.assignment_status',
           'assignment.address',
           'assignment.assignment_date',
@@ -103,8 +86,6 @@ export class CandidatesService {
           'assignment.execution_time_minutes',
         ])
         .getRawMany();
-
-      console.log(assignments);
 
       arrayAssignments = assignments.map((e) => {
         return {
@@ -118,7 +99,7 @@ export class CandidatesService {
           city_id: e.assignment_city_id,
           title: e.assignment_assignment_title,
           description: e.assignment_assignment_description,
-          executor_id: e.assignment_executor_id,
+          executor_id: e.executor_id,
           execution_time_minutes: e.assignment_execution_time_minutes,
         };
       });
@@ -195,7 +176,7 @@ export class CandidatesService {
 
     try {
       await this.candidateRepository.delete(candidate.id);
-      return 'user was successfully deleted';
+      return { message: 'user was successfully deleted' };
     } catch (error) {
       throw new ConflictException(error);
     }
