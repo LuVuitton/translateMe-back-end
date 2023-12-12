@@ -128,6 +128,7 @@ export class AssignmentService {
       'a.city_id',
       'a.assignment_title',
       'a.assignment_description',
+      'a.assignment_creation_date',
       // 'a.required_languages_id',
       // 'a.customer_languages_id',
     ]);
