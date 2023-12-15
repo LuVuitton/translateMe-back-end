@@ -23,16 +23,21 @@ import { Review } from './reviews/entities/review.entity';
 import { AuthModule } from './auth/auth.module';
 import { ContactVisibilityModule } from './contact-visibility/contact-visibility.module';
 import { ContactVisibility } from './contact-visibility/entities/contact-visibility.entity';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath:'.env',
+    }),
     TypeOrmModule.forRoot({
       type: 'mysql',
-      host: 'localhost',
-      port: 8889,
-      username: 'root',
-      password: 'root',
-      database: 'near',
+      host: process.env.DB_HOST,
+      port: +process.env.PORT,
+      username: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
       entities: [
         User,
         Assignment,
