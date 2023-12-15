@@ -23,7 +23,7 @@ export class CandidatesController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  getAssignments(@Request() req ) {
+  getAssignments(@Request() req) {
     return this.candidatesService.getAssignmentsByCandidateID(req.user.user_id);
   }
 
@@ -39,5 +39,10 @@ export class CandidatesController {
     return this.candidatesService.remove(createCandidateDto, req.user.user_id);
   }
 
+  @Get('test/:id')
+  getCandidatesByManyAssignmentIDs(@Param('id') id: string) {
+    const arr = id.split(',').map(e=>+e);
 
+    return this.candidatesService.getCandidatesByManyAssignmentIDs(arr);
+  }
 }

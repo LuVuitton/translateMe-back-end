@@ -20,37 +20,56 @@ export class CandidatesService {
     private readonly contactVisibilityService: ContactVisibilityService,
   ) {}
 
-  async getCandidatesByAssignmentID(assignmentID: number) {
+  async getCandidatesByAssignmentID(
+    assignmentID: number,
+    onlyID: boolean = false,
+  ) {
     let arrayCandidates: any[];
     let candidates: any[];
-    try {
-      candidates = await this.candidateRepository
-        .createQueryBuilder('c')
-        .where('c.assignment_id = :id', {
-          id: assignmentID,
-        })
-        .leftJoinAndSelect('c.user_id', 'user')
-        .leftJoinAndSelect('c.assignment_id', 'assignment')
-        .select([
-          'c.candidate_creation_date',
-          'c.assignment_id',
-          'user.user_id',
-          'user.full_name',
-          'user.user_photo',
-          'assignment.executor_id',
-        ])
-        .getRawMany();
 
-      arrayCandidates = candidates.map((e) => {
-        return {
-          assignment_id: e.c_assignment_id,
-          apply_time: e.c_candidate_creation_date,
-          candidate_id: e.user_user_id,
-          candidate_full_name: e.user_full_name,
-          candidate_photo: e.user_user_photo,
-          isExecutor: e.user_user_id === e.executor_id,
-        };
-      });
+    try {
+      if (onlyID) {
+        candidates = await this.candidateRepository
+          .createQueryBuilder('c')
+          .where('c.assignment_id = :id', {
+            id: assignmentID,
+          })
+          .leftJoinAndSelect('c.user_id', 'user')
+          .select(['user.user_id'])
+          .getRawMany();
+
+        arrayCandidates = candidates.map((e) => {
+          return e.user_user_id;
+        });
+      } else {
+        candidates = await this.candidateRepository
+          .createQueryBuilder('c')
+          .where('c.assignment_id = :id', {
+            id: assignmentID,
+          })
+          .leftJoinAndSelect('c.user_id', 'user')
+          .leftJoinAndSelect('c.assignment_id', 'assignment')
+          .select([
+            'c.candidate_creation_date',
+            'c.assignment_id',
+            'user.user_id',
+            'user.full_name',
+            'user.user_photo',
+            'assignment.executor_id',
+          ])
+          .getRawMany();
+
+        arrayCandidates = candidates.map((e) => {
+          return {
+            assignment_id: e.c_assignment_id,
+            apply_time: e.c_candidate_creation_date,
+            candidate_id: e.user_user_id,
+            candidate_full_name: e.user_full_name,
+            candidate_photo: e.user_user_photo,
+            isExecutor: e.user_user_id === e.executor_id,
+          };
+        });
+      }
     } catch (error) {
       return error;
     }
@@ -181,9 +200,22 @@ export class CandidatesService {
       throw new ConflictException(error);
     }
   }
+
+  async getCandidatesByManyAssignmentIDs(assignmentIDs: number[]) {
+    const result = [];
+
+    for (const i of assignmentIDs) {
+      const candidates = await this.getCandidatesByAssignmentID(i, true);
+      result.push(candidates);
+    }
+    console.log(result);
+
+    return result;
+  }
 }
 
-type GetAllByAsID = {
-  authUserID: number;
-  assignmentID: number;
-};
+// {
+//   totalCount: 3,
+//   assignment_id: 1,
+//   candidates: [ [Object], [Object], [Object] ]
+// },

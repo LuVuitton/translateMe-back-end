@@ -98,26 +98,6 @@ export class AssignmentService {
 
   async getSortedAssigments(sortedDto: SortedAssignmentDto) {
     const { limit, location, location_id, matchinglang } = sortedDto;
-    let matchingAssigID: number[] = [];
-
-    if (matchinglang) {
-      const reqMatch = await this.requiredLangRepository
-        .createQueryBuilder('rl')
-        .select('DISTINCT rl.assignment_id')
-        .where('rl.language_id IN (:...matchinglang)', { matchinglang })
-        .getRawMany();
-
-      const custMatch = await this.сustomerLangRepository
-        .createQueryBuilder('cl')
-        .select('DISTINCT cl.assignment_id')
-        .where('cl.language_id IN (:...matchinglang)', { matchinglang })
-        .getRawMany();
-
-      matchingAssigID = reqMatch
-        .map((obj) => obj.assignment_id)
-        .filter((id) => custMatch.some((obj) => obj.assignment_id === id));
-      console.log(matchingAssigID);
-    }
 
     const qb = this.assignmentRepository.createQueryBuilder('a');
     qb.select([
@@ -132,26 +112,6 @@ export class AssignmentService {
       // 'a.required_languages_id',
       // 'a.customer_languages_id',
     ]);
-
-    qb.where(`a.assignment_status=1`);
-    qb.select();
-
-    if (location === 'country' && matchingAssigID.length > 0) {
-      qb.andWhere(`a.country_id=${location_id}`);
-      qb.andWhere(`a.assignment_id IN (:...matchingAssigID)`, {
-        matchingAssigID,
-      });
-    } else if (location === 'city' && matchingAssigID.length > 0) {
-      qb.andWhere(`a.city_id=${location_id}`);
-      qb.andWhere(`a.assignment_id IN (:...matchingAssigID)`, {
-        matchingAssigID,
-      });
-    } else if (location === 'country' && matchingAssigID.length === 0) {
-      qb.andWhere(`a.country_id=${location_id}`);
-    } else if (location === 'city' && matchingAssigID.length === 0) {
-      qb.andWhere(`a.city_id=${location_id}`);
-    }
-
     const [assigments, totalCount] = await qb.getManyAndCount();
 
     const requiredLangData = {};
@@ -193,16 +153,15 @@ export class AssignmentService {
   }
 
   async findOne(id: number) {
-    const assignment:any = await this.assignmentRepository
+    const assignment: any = await this.assignmentRepository
       .createQueryBuilder('a')
       .where('a.assignment_id = :assignmentId', { assignmentId: id })
       .leftJoinAndSelect('a.customer_id', 'customer')
       .leftJoinAndSelect('a.executor_id', 'executor')
       .getOne();
 
+    // console.log(assignment);
 
-      // console.log(assignment);
-      
     if (!assignment) {
       throw new NotFoundException('Assignment not found');
     }
@@ -213,9 +172,6 @@ export class AssignmentService {
       full_name: c_full_name,
       user_photo: c_user_photo,
     } = customer_id;
-
-   
-  
 
     const qb = this.candidateRepository.createQueryBuilder('cd');
     qb.select(['cd.user_id']);
@@ -232,9 +188,9 @@ export class AssignmentService {
         user_photo: c_user_photo,
       },
       executor: {
-        executor_id: executor_id?executor_id.user_id: null,
-        full_name: executor_id?executor_id.full_name:null,
-        user_photo: executor_id?executor_id.user_photo:null,
+        executor_id: executor_id ? executor_id.user_id : null,
+        full_name: executor_id ? executor_id.full_name : null,
+        user_photo: executor_id ? executor_id.user_photo : null,
       },
       candidates: {
         candidatesCount: candidatesArr.length,
@@ -275,41 +231,52 @@ export class AssignmentService {
         .where('a.customer_id = :authUserID', { authUserID })
         .getMany();
 
-        console.log("allllll:", allMyAssignment);
-        
+      const assigment_ids = allMyAssignment.map((e) => e.assignment_id);
+      const candidates: AssignmentsCandidate[] =
+        await this.candidatesService.getCandidatesByManyAssignmentIDs(
+          assigment_ids,
+        );
 
-        const requiredLangData = {};
-        const customerLangData = {};
-        for (const e of allMyAssignment) {
-          const requiredLangInfo = await this.requiredLangRepository
-            .createQueryBuilder('req')
-            .where('req.assignment_id = :assignmentId', {
-              assignmentId: e.assignment_id,
-            })
-            .select('req.language_id')
-            .getRawMany();
-    
-          const customerLangInfo = await this.сustomerLangRepository
-            .createQueryBuilder('cus')
-            .where('cus.assignment_id = :assignmentId', {
-              assignmentId: e.assignment_id,
-            })
-            .select('cus.language_id')
-            .getRawMany();
-    
-          requiredLangData[e.assignment_id] = requiredLangInfo.map(
-            (e) => e.language_id,
-          );
-          customerLangData[e.assignment_id] = customerLangInfo.map(
-            (e) => e.language_id,
-          );
+      const requiredLangData = {};
+      const customerLangData = {};
+      for (const e of allMyAssignment) {
+        const requiredLangInfo = await this.requiredLangRepository
+          .createQueryBuilder('req')
+          .where('req.assignment_id = :assignmentId', {
+            assignmentId: e.assignment_id,
+          })
+          .select('req.language_id')
+          .getRawMany();
+
+        const customerLangInfo = await this.сustomerLangRepository
+          .createQueryBuilder('cus')
+          .where('cus.assignment_id = :assignmentId', {
+            assignmentId: e.assignment_id,
+          })
+          .select('cus.language_id')
+          .getRawMany();
+
+        requiredLangData[e.assignment_id] = requiredLangInfo.map(
+          (e) => e.language_id,
+        );
+        customerLangData[e.assignment_id] = customerLangInfo.map(
+          (e) => e.language_id,
+        );
+      }
+
+      allMyAssignment.forEach((e: AssignmentWithLang) => {
+        e.required_languages_id = requiredLangData[e.assignment_id];
+        e.customer_languages_id = customerLangData[e.assignment_id];
+      });
+
+      allMyAssignment.forEach((e: AssignmentWithLang) => {
+        for (let i = 0; i < candidates.length; i++) {
+          if (e.assignment_id === candidates[i].assignment_id) {
+            e.candidates = candidates[i]
+          } 
         }
-    
-        allMyAssignment.forEach((e: AssignmentWithLang) => {
-          e.required_languages_id = requiredLangData[e.assignment_id];
-          e.customer_languages_id = customerLangData[e.assignment_id];
-        });
-     
+      });
+
       return {
         user_id: authUserID,
         totalCount: allMyAssignment.length,
@@ -333,8 +300,8 @@ export class AssignmentService {
     const candatesDate =
       await this.candidatesService.getCandidatesByAssignmentID(assigment_id);
 
-      console.log(candatesDate);
-      
+    console.log(candatesDate);
+
     const isOneOfCandidates = candatesDate.candidates.some(
       (e) => e.candidate_id === candidate_id,
     );
@@ -381,10 +348,17 @@ export class AssignmentService {
 type AssignmentWithLang = Assignment & {
   required_languages_id: number[]; // Подставьте правильный тип данных
   customer_languages_id: number[]; // Подставьте правильный тип данных
+  candidates: any;
 };
 
 type PickOne = {
   authUserID: number;
   assigment_id: number;
   candidate_id: number;
+};
+
+type AssignmentsCandidate = {
+  totalCount: number;
+  assignment_id: number;
+  candidates: any[];
 };
